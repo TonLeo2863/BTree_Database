@@ -1,56 +1,63 @@
 ﻿#include <iostream>
-// Nhớ bỏ comment các file .h khi bắt đầu code nhé!
-// #include "BTree.h"
-// #include "Record.h"
-// #include "FileHandler.h"
-// #include "UserInterface.h"
-//test
+#include <string>
+#include <cstring>
 
-using namespace std;
+#include "../2_Database/Record.h"
+#include "../3_FileIO/FileHandler.h"
+#include "../4_UI_Console/UserInterface.h"
+#include "Benchmark.h"
+static void printUsage(const char* programName) {
+    std::cout << "\nUsage:\n";
+    std::cout << "  " << programName << "                    — Interactive UI\n";
+    std::cout << "  " << programName << " --benchmark         — Full scalability test (1K-1M)\n";
+    std::cout << "  " << programName << " --bench-quick       — Quick benchmark (10K)\n";
+    std::cout << "  " << programName << " --gen-csv N file    — Generate N rows into CSV\n";
+    std::cout << "\n";
+}
 
-int main() {
-    int choice;
-    do {
-        cout << "      MENU TEST DU AN QUAN LY LINH KIEN\n";
-        cout << "1. Test chuc nang B-Tree (Thanh vien 1 & 2)\n";
-        cout << "2. Test chuc nang Database/Record (Thanh vien 3)\n";
-        cout << "3. Test chuc nang File I/O (Thanh vien 4)\n";
-        cout << "4. Test chuc nang UI Console (Thanh vien 5)\n";
-        cout << "0. Thoat\n";
-        cout << "Chon module de test: ";
-        cin >> choice;
+int main(int argc, char* argv[]) {
+    if (argc >= 2 && std::strcmp(argv[1], "--benchmark") == 0) {
+        Benchmark bm;
+        bm.runScalabilityTest();
+        return 0;
+    }
 
-        switch (choice) {
-        case 1: {
-            cout << "\n--- Dang chay Test B-Tree ---\n";
-            // Thành viên 1 & 2 viết code test của mình ở đây
-            // Ví dụ:
-            // BTree myTree;
-            // myTree.insert(101, ...);
-            break;
-        }
-        case 2: {
-            cout << "\n--- Dang chay Test Database ---\n";
-            // Thành viên 3 viết code test cấu trúc HardwareRecord ở đây
-            break;
-        }
-        case 3: {
-            cout << "\n--- Dang chay Test File I/O ---\n";
-            // Thành viên 4 viết code test dọc/ghi file .csv ở đây
-            break;
-        }
-        case 4: {
-            cout << "\n--- Dang chay Test UI Console ---\n";
-            // Thành viên 5 viết code test giao diện ở đây
-            break;
-        }
-        case 0:
-            cout << "\nThoat chuong trinh test...\n";
-            break;
-        default:
-            cout << "\nLua chon khong hop le. Vui long chon lai!\n";
-        }
-    } while (choice != 0);
+    if (argc >= 2 && std::strcmp(argv[1], "--bench-quick") == 0) {
+        Benchmark bm;
+        std::cout << "\n  [Quick Benchmark] n = 10,000\n";
+        BenchmarkSuite suite = bm.runFullSuite(10000);
+        suite.print();
+        return 0;
+    }
 
+    if (argc >= 4 && std::strcmp(argv[1], "--gen-csv") == 0) {
+        int n = std::atoi(argv[2]);
+        std::string filename = argv[3];
+        if (n <= 0) {
+            std::cerr << "[Error] N must be a positive integer.\n";
+            return 1;
+        }
+        FileResult r = FileHandler::generateSampleCSV(filename, n);
+        std::cout << (r.success ? "[OK] " : "[FAIL] ") << r.message << "\n";
+        return r.success ? 0 : 1;
+    }
+
+    if (argc >= 2 && (std::strcmp(argv[1], "--help") == 0 ||
+                      std::strcmp(argv[1], "-h") == 0)) {
+        printUsage(argv[0]);
+        return 0;
+    }
+
+    ComponentDatabase db;
+
+    if (argc >= 2) {
+        std::string filename = argv[1];
+        std::cout << "\n  [Startup] Đang tải dữ liệu từ [" << filename << "]...\n";
+        FileResult r = FileHandler::importCSV(db, filename);
+        std::cout << "  " << r.message << "\n";
+    }
+
+    UserInterface ui(db);
+    ui.run();
     return 0;
 }
