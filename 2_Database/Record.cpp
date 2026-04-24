@@ -1,52 +1,30 @@
-/**
- * ============================================================
- * MODULE: 2_Database
- * FILE  : Record.cpp
- * ============================================================
- */
 #include "Record.h"
-
 #include <sstream>
 #include <iomanip>
 #include <iostream>
 #include <ctime>
-#include <stdexcept>
 
-// ============================================================
-// ComponentRecord — implementation
-// ============================================================
-ComponentRecord::ComponentRecord()
-    : id(0), name(""), category(""), quantity(0), price(0.0), supplier("") {}
+AccountRecord::AccountRecord() : stk(0), chuThe(""), soDu(0.0), chiNhanh("") {}
 
-ComponentRecord::ComponentRecord(int id,
-                                 const std::string& name,
-                                 const std::string& category,
-                                 int quantity,
-                                 double price,
-                                 const std::string& supplier)
-    : id(id), name(name), category(category),
-      quantity(quantity), price(price), supplier(supplier) {}
+AccountRecord::AccountRecord(int stk, const std::string& chuThe, double soDu, const std::string& chiNhanh)
+    : stk(stk), chuThe(chuThe), soDu(soDu), chiNhanh(chiNhanh) {}
 
-std::string ComponentRecord::toString() const {
+std::string AccountRecord::toString() const {
     std::ostringstream oss;
     oss << std::left
-        << "ID: "       << std::setw(8)  << id
-        << "| Name: "   << std::setw(30) << name
-        << "| Cat: "    << std::setw(10) << category
-        << "| Qty: "    << std::setw(8)  << quantity
-        << "| Price: "  << std::setw(12) << std::fixed << std::setprecision(2) << price
-        << "| Supplier: " << supplier;
+        << "STK: "     << std::setw(10) << stk
+        << "| Chủ thẻ: " << std::setw(25) << chuThe
+        << "| Số dư: "   << std::setw(15) << std::fixed << std::setprecision(0) << soDu
+        << "| Chi nhánh: " << chiNhanh;
     return oss.str();
 }
 
-std::string ComponentRecord::toCSV() const {
-    // Escape commas in string fields by wrapping in quotes
+std::string AccountRecord::toCSV() const {
     auto escape = [](const std::string& s) -> std::string {
-        if (s.find(',') != std::string::npos ||
-            s.find('"') != std::string::npos) {
+        if (s.find(',') != std::string::npos || s.find('"') != std::string::npos) {
             std::string result = "\"";
             for (char c : s) {
-                if (c == '"') result += "\"\""; // double-quote escape
+                if (c == '"') result += "\"\""; 
                 else result += c;
             }
             result += "\"";
@@ -54,48 +32,30 @@ std::string ComponentRecord::toCSV() const {
         }
         return s;
     };
-
     std::ostringstream oss;
-    oss << id << ","
-        << escape(name) << ","
-        << escape(category) << ","
-        << quantity << ","
-        << std::fixed << std::setprecision(2) << price << ","
-        << escape(supplier);
+    oss << stk << "," << escape(chuThe) << "," << std::fixed << std::setprecision(0) << soDu << "," << escape(chiNhanh);
     return oss.str();
 }
 
-// ── TransactionType helper ───────────────────────────────────
 std::string transactionTypeToString(TransactionType t) {
     switch (t) {
-        case TransactionType::INSERT: return "INSERT";
-        case TransactionType::UPDATE: return "UPDATE";
-        case TransactionType::DELETE: return "DELETE";
-        case TransactionType::SEARCH: return "SEARCH";
-        default:                      return "UNKNOWN";
+        case TransactionType::OPEN_ACCOUNT:  return "OPEN";
+        case TransactionType::CLOSE_ACCOUNT: return "CLOSE";
+        case TransactionType::DEPOSIT:       return "DEPOSIT";
+        case TransactionType::WITHDRAW:      return "WITHDRAW";
+        case TransactionType::TRANSFER:      return "TRANSFER";
+        default:                             return "UNKNOWN";
     }
 }
 
-// ============================================================
-// TransactionNode — constructor
-// ============================================================
-TransactionNode::TransactionNode(TransactionType type,
-                                 const ComponentRecord& rec,
-                                 const std::string& ts)
+TransactionNode::TransactionNode(TransactionType type, const AccountRecord& rec, const std::string& ts)
     : type(type), record(rec), timestamp(ts), next(nullptr) {}
 
-// ============================================================
-// TransactionHistory — constructor / destructor
-// ============================================================
-TransactionHistory::TransactionHistory()
-    : head(nullptr), tail(nullptr), size(0) {}
+TransactionHistory::TransactionHistory() : head(nullptr), tail(nullptr), size(0) {}
 
-TransactionHistory::~TransactionHistory() {
-    clear();
-}
+TransactionHistory::~TransactionHistory() { clear(); }
 
 void TransactionHistory::clear() {
-    // Walk the list and free every node — prevents memory leak
     TransactionNode* cur = head;
     while (cur != nullptr) {
         TransactionNode* next = cur->next;
@@ -107,62 +67,46 @@ void TransactionHistory::clear() {
     size = 0;
 }
 
-// ── Static helper: current timestamp string ─────────────────
 std::string TransactionHistory::getCurrentTimestamp() {
     std::time_t now = std::time(nullptr);
     char buf[32];
-    // Format: YYYY-MM-DD HH:MM:SS
     std::strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S", std::localtime(&now));
     return std::string(buf);
 }
 
-// ── addTransaction — O(1) push_front ────────────────────────
-void TransactionHistory::addTransaction(TransactionType type,
-                                        const ComponentRecord& record) {
-    TransactionNode* newNode = new TransactionNode(type, record,
-                                                   getCurrentTimestamp());
+void TransactionHistory::addTransaction(TransactionType type, const AccountRecord& record) {
+    TransactionNode* newNode = new TransactionNode(type, record, getCurrentTimestamp());
     newNode->next = head;
     head = newNode;
-
-    if (tail == nullptr) tail = head; // first node
-
+    if (tail == nullptr) tail = head; 
     size++;
-
-    // Cap memory: if over limit, drop oldest (tail)
     if (size > MAX_HISTORY) removeTail();
 }
 
-// ── removeTail — O(n) but called rarely (only when > MAX_HISTORY) ─
 void TransactionHistory::removeTail() {
     if (head == nullptr) return;
     if (head == tail) {
-        // Only one node
         delete head;
-        head = nullptr;
-        tail = nullptr;
+        head = tail = nullptr;
         size = 0;
         return;
     }
-
-    // Walk to node before tail
     TransactionNode* cur = head;
     while (cur->next != tail) cur = cur->next;
-
     delete tail;
     tail = cur;
     tail->next = nullptr;
     size--;
 }
 
-// ── printHistory ─────────────────────────────────────────────
 void TransactionHistory::printHistory(int limit) const {
-    std::cout << "\n╔══════════════════════════════════════════════════════╗\n";
-    std::cout << "║              TRANSACTION HISTORY                     ║\n";
-    std::cout << "╠══════════════════════════════════════════════════════╣\n";
+    std::cout << "\n╔════════════════════════════════════════════════════════════╗\n";
+    std::cout << "║                  LỊCH SỬ GIAO DỊCH (DSLK)                  ║\n";
+    std::cout << "╠════════════════════════════════════════════════════════════╣\n";
 
     if (head == nullptr) {
-        std::cout << "║  (no transactions recorded)                          ║\n";
-        std::cout << "╚══════════════════════════════════════════════════════╝\n";
+        std::cout << "║  (Chưa có giao dịch nào)                                   ║\n";
+        std::cout << "╚════════════════════════════════════════════════════════════╝\n";
         return;
     }
 
@@ -170,87 +114,75 @@ void TransactionHistory::printHistory(int limit) const {
     int count = 0;
     while (cur != nullptr && count < limit) {
         std::cout << "║ [" << cur->timestamp << "] "
-                  << std::left << std::setw(7)
-                  << transactionTypeToString(cur->type)
-                  << " ID=" << cur->record.id
-                  << " " << cur->record.name.substr(0, 20)
+                  << std::left << std::setw(10) << transactionTypeToString(cur->type)
+                  << " STK: " << std::setw(8) << cur->record.stk
+                  << " | " << cur->record.chuThe.substr(0, 15)
                   << "\n";
         cur = cur->next;
         count++;
     }
-
-    std::cout << "╚══════════════════════════════════════════════════════╝\n";
-    std::cout << "  (showing " << count << " of " << size << " entries)\n\n";
+    std::cout << "╚════════════════════════════════════════════════════════════╝\n";
 }
 
-int  TransactionHistory::getSize()  const { return size; }
-bool TransactionHistory::isEmpty()  const { return size == 0; }
+int  TransactionHistory::getSize() const { return size; }
+bool TransactionHistory::isEmpty() const { return size == 0; }
 
-// ============================================================
-// ComponentDatabase — implementation
-// ============================================================
-ComponentDatabase::ComponentDatabase()
-    : btreeIndex(BTREE_T), recordMap(), history(), recordCount(0) {}
+AccountDatabase::AccountDatabase() : btreeIndex(BTREE_T), recordMap(), history(), recordCount(0) {}
 
-// ── addRecord ────────────────────────────────────────────────
-bool ComponentDatabase::addRecord(const ComponentRecord& record) {
-    if (record.id <= 0) return false; // invalid ID
-    if (btreeIndex.search(record.id)) return false; // duplicate
+bool AccountDatabase::addRecord(const AccountRecord& record) {
+    if (record.stk <= 0) return false; 
+    if (btreeIndex.search(record.stk)) return false; 
 
-    btreeIndex.insert(record.id, 1);      // insert into index
-    recordMap[record.id] = record;         // store record data
+    btreeIndex.insert(record.stk, 1);      
+    recordMap[record.stk] = record;         
     recordCount++;
 
-    history.addTransaction(TransactionType::INSERT, record);
+    history.addTransaction(TransactionType::OPEN_ACCOUNT, record);
     return true;
 }
 
-// ── searchRecord ─────────────────────────────────────────────
-const ComponentRecord* ComponentDatabase::searchRecord(int id) const {
-    if (!btreeIndex.search(id)) return nullptr;
-
-    auto it = recordMap.find(id);
+const AccountRecord* AccountDatabase::searchRecord(int stk) const {
+    if (!btreeIndex.search(stk)) return nullptr;
+    auto it = recordMap.find(stk);
     if (it == recordMap.end()) return nullptr;
     return &(it->second);
 }
 
-// ── updateRecord ─────────────────────────────────────────────
-bool ComponentDatabase::updateRecord(const ComponentRecord& record) {
-    if (!btreeIndex.search(record.id)) return false;
-
-    recordMap[record.id] = record; // overwrite in-place
-    history.addTransaction(TransactionType::UPDATE, record);
+bool AccountDatabase::updateRecord(const AccountRecord& record) {
+    if (!btreeIndex.search(record.stk)) return false;
+    recordMap[record.stk] = record; 
+    history.addTransaction(TransactionType::DEPOSIT, record); // Tạm ghi là Deposit/Update
     return true;
 }
 
-// ── deleteRecord ─────────────────────────────────────────────
-bool ComponentDatabase::deleteRecord(int id) {
-    if (!btreeIndex.search(id)) return false;
-
-    // Log before deletion (so we have the record data)
-    auto it = recordMap.find(id);
+bool AccountDatabase::deleteRecord(int stk) {
+    if (!btreeIndex.search(stk)) return false;
+    auto it = recordMap.find(stk);
     if (it != recordMap.end()) {
-        history.addTransaction(TransactionType::DELETE, it->second);
+        history.addTransaction(TransactionType::CLOSE_ACCOUNT, it->second);
         recordMap.erase(it);
     }
-
-    btreeIndex.remove(id);
+    btreeIndex.remove(stk);
     recordCount--;
     return true;
 }
 
-// ── forEachSorted ────────────────────────────────────────────
-void ComponentDatabase::forEachSorted(
-        std::function<void(const ComponentRecord&)> callback) const {
-    btreeIndex.traverseInOrder([&](int key, int /*value*/) {
+void AccountDatabase::forEachSorted(std::function<void(const AccountRecord&)> callback) const {
+    btreeIndex.traverseInOrder([&](int key, int) {
         auto it = recordMap.find(key);
         if (it != recordMap.end()) callback(it->second);
     });
 }
 
-// ── getAllRecords ─────────────────────────────────────────────
-std::vector<ComponentRecord> ComponentDatabase::getAllRecords() const {
-    std::vector<ComponentRecord> result;
+void AccountDatabase::rangeScan(int minStk, int maxStk, std::function<void(const AccountRecord&)> callback) const {
+    btreeIndex.rangeScan(minStk, maxStk, [&](int key, int) {
+        auto it = recordMap.find(key);
+        if (it != recordMap.end()) callback(it->second);
+    });
+}
+
+std::vector<AccountRecord> AccountDatabase::getAllRecords() const {
+    std::vector<AccountRecord> result;
     result.reserve(recordCount);
     for (const auto& kv : recordMap) {
         result.push_back(kv.second);
@@ -258,28 +190,17 @@ std::vector<ComponentRecord> ComponentDatabase::getAllRecords() const {
     return result;
 }
 
-// ── Utility ──────────────────────────────────────────────────
-int  ComponentDatabase::getRecordCount() const { return recordCount; }
-bool ComponentDatabase::isEmpty()        const { return recordCount == 0; }
+int  AccountDatabase::getRecordCount() const { return recordCount; }
+bool AccountDatabase::isEmpty()        const { return recordCount == 0; }
 
-void ComponentDatabase::clear() {
+void AccountDatabase::clear() {
     btreeIndex.clear();
     recordMap.clear();
     history.clear();
     recordCount = 0;
 }
 
-// ── History ──────────────────────────────────────────────────
-TransactionHistory& ComponentDatabase::getHistory() { return history; }
-
-void ComponentDatabase::printHistory(int limit) const {
-    history.printHistory(limit);
-}
-
-// ── BTree stats ──────────────────────────────────────────────
-int       ComponentDatabase::getBTreeHeight()    const {
-    return btreeIndex.getHeight();
-}
-long long ComponentDatabase::getBTreeNodeCount() const {
-    return btreeIndex.getNodeCount();
-}
+TransactionHistory& AccountDatabase::getHistory() { return history; }
+void AccountDatabase::printHistory(int limit) const { history.printHistory(limit); }
+int  AccountDatabase::getBTreeHeight()   const { return btreeIndex.getHeight(); }
+long long AccountDatabase::getBTreeNodeCount() const { return btreeIndex.getNodeCount(); }

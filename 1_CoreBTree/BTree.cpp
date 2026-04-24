@@ -336,3 +336,23 @@ long long BTree::nodeCountHelper(BTreeNode* node) const {
     }
     return count;
 }
+
+void BTree::rangeScan(int minKey, int maxKey, std::function<void(int, int)> callback) const {
+    rangeScanHelper(root, minKey, maxKey, callback);
+}
+
+void BTree::rangeScanHelper(BTreeNode* node, int minKey, int maxKey, std::function<void(int, int)> cb) const {
+    if (node == nullptr) return;
+    int i;
+    for (i = 0; i < node->n; ++i) {
+        if (!node->leaf && minKey < node->keys[i]) {
+            rangeScanHelper(node->children[i], minKey, maxKey, cb);
+        }
+        if (node->keys[i] >= minKey && node->keys[i] <= maxKey) {
+            cb(node->keys[i], node->values[i]);
+        }
+    }
+    if (!node->leaf && maxKey > node->keys[i - 1]) {
+        rangeScanHelper(node->children[i], minKey, maxKey, cb);
+    }
+}

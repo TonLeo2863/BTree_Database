@@ -3,26 +3,23 @@
 #include <vector>
 #include "../2_Database/Record.h"
 #include "../3_FileIO/FileHandler.h"
+#include "../1_CoreBTree/BST.h"
 
 struct BenchmarkResult {
     std::string operationName;
-    int         n;               
-    double      totalMs;         
-    double      perOpMicros;     
-    int         btreeHeight;     
-    long long   btreeNodes;      
+    int         n;              
+    double      totalMs;        
+    int         btreeHeight;    
+    int         bstHeight;      // MỚI: Chiều cao BST
 
     BenchmarkResult();
-    BenchmarkResult(const std::string& name, int n, double ms,
-                    int height, long long nodes);
-
+    BenchmarkResult(const std::string& name, int n, double ms, int btHeight, int bstHeight);
     std::string toTableRow() const;
 };
 
 struct BenchmarkSuite {
-    int                          n;
+    int n;
     std::vector<BenchmarkResult> results;
-
     BenchmarkSuite(int n) : n(n) {}
     void print() const;
 };
@@ -31,18 +28,7 @@ class Benchmark {
 public:
     Benchmark() = default;
     ~Benchmark() = default;
-    BenchmarkResult runInsert(int n);
-    BenchmarkResult runSearchSequential(ComponentDatabase& db, int n);
-    BenchmarkResult runSearchRandom(ComponentDatabase& db, int n);
-    BenchmarkResult runDelete(ComponentDatabase& db, int n);
-    BenchmarkSuite runFullSuite(int n);
     void runScalabilityTest();
-    static void printTableHeader();
-    static void printSeparator();
-    static void printSuiteComparison(const std::vector<BenchmarkSuite>& suites);
-
 private:
-    static std::vector<ComponentRecord> generateRecords(int n);
-
-    static std::vector<int> generateRandomIDs(int n);
+    static std::vector<AccountRecord> generateRecords(int n);
 };
